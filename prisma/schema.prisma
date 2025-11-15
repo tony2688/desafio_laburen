@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id                String   @id
+  type              String
+  size              String
+  color             String
+  availableQuantity Int
+  isAvailable       Boolean
+  price50           Decimal
+  price100          Decimal
+  price200          Decimal
+  currency          String
+  category          String
+  description       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  cartItems         CartItem[]
+}
+
+model Cart {
+  id              String    @id @default(uuid())
+  whatsappUserId  String
+  status          CartStatus
+  currency        String
+  subtotal        Decimal   @default(0)
+  total           Decimal   @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  items           CartItem[]
+}
+
+model CartItem {
+  id                  String   @id @default(uuid())
+  cartId              String
+  productId           String
+  productNameSnapshot String?
+  unitPrice           Decimal
+  quantity            Int
+  subtotal            Decimal
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  cart                Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product             Product  @relation(fields: [productId], references: [id])
+}
+
+enum CartStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
