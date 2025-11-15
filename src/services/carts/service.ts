@@ -1,4 +1,5 @@
 import { prisma } from "../../infra/prisma/client";
+import type { Product } from "@prisma/client";
 
 type ItemInput = { productId: string; quantity: number };
 
@@ -30,16 +31,23 @@ export const CartsService = {
     }
     for (const it of items) {
       const product = await prisma.product.findUnique({ where: { id: it.productId } });
-      if (!product || !product.isAvailable || product.availableQuantity < it.quantity) {
+      if (!product || !product.isAvailable) {
         throw new Error("stock_insufficient");
       }
       const existing = cart.items.find((ci) => ci.productId === it.productId);
+      const newQuantity = (existing?.quantity || 0) + it.quantity;
+      if (product.availableQuantity < newQuantity) {
+        throw new Error("stock_insufficient");
+      }
+      const unitPrice = getUnitPriceForQuantity(product, newQuantity);
+      const subtotal = Number(unitPrice) * newQuantity;
       if (existing) {
         await prisma.cartItem.update({
           where: { id: existing.id },
           data: {
-            quantity: existing.quantity + it.quantity,
-            subtotal: (existing.quantity + it.quantity) * Number(existing.unitPrice),
+            quantity: newQuantity,
+            unitPrice,
+            subtotal,
           },
         });
       } else {
@@ -48,9 +56,9 @@ export const CartsService = {
             cartId,
             productId: it.productId,
             productNameSnapshot: product.type + " " + product.size + " " + product.color,
-            unitPrice: product.price50,
-            quantity: it.quantity,
-            subtotal: Number(product.price50) * it.quantity,
+            unitPrice,
+            quantity: newQuantity,
+            subtotal,
           },
         });
       }
@@ -75,16 +83,24 @@ export const CartsService = {
     if (ops.updateItems) {
       for (const it of ops.updateItems) {
         const product = await prisma.product.findUnique({ where: { id: it.productId } });
-        if (!product || product.availableQuantity < it.quantity) {
+        if (!product) {
+          throw new Error("stock_insufficient");
+        }
+        if (product.availableQuantity < it.quantity) {
           throw new Error("stock_insufficient");
         }
         const ci = await prisma.cartItem.findFirst({ where: { cartId, productId: it.productId } });
         if (!ci) {
           continue;
         }
+        const unitPrice = getUnitPriceForQuantity(product, it.quantity);
         await prisma.cartItem.update({
           where: { id: ci.id },
-          data: { quantity: it.quantity, subtotal: Number(ci.unitPrice) * it.quantity },
+          data: {
+            quantity: it.quantity,
+            unitPrice,
+            subtotal: Number(unitPrice) * it.quantity,
+          },
         });
       }
     }
@@ -110,3 +126,9 @@ export const CartsService = {
     return cart;
   },
 };
+
+function getUnitPriceForQuantity(product: Product, quantity: number) {
+  if (quantity < 50) return product.price50;
+  if (quantity < 100) return product.price100;
+  return product.price200;
+}
