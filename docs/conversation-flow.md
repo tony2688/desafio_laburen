@@ -1,5 +1,9 @@
 ## Flujo conversacional
 
+### Nota sobre WhatsApp y sandbox
+- El bot siempre responde al `from` del webhook (WA ID del remitente).
+- En modo sandbox de WhatsApp Cloud API solo se puede enviar a números previamente autorizados en el panel (`Para`).
+
 ### Explorar/buscar productos
 - Usuario: "Mostrame camisetas deportivas", "Buscá pantalón negro talla M"
 - Herramienta: `getProducts({ q, page, page_size })` → `GET /products?q=`

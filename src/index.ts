@@ -17,6 +17,10 @@ app.use("/carts", cartsRouter);
 app.use("/webhooks/whatsapp", whatsappRouter);
 app.use(errorHandler);
 
+app.get("/", (_req, res) => {
+  res.send("ok");
+});
+
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 app.listen(port, () => {
   logger.info({ port }, "server_started");
