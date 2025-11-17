@@ -21,6 +21,10 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("ok");
 });
 
+app.get("/healthz", (_req: Request, res: Response) => {
+  res.status(200).json({ status: "ok" });
+});
+
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 app.listen(port, () => {
   logger.info({ port }, "server_started");

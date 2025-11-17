@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const base = process.env.BASE_URL || "http://localhost:3000";
+const base =
+  process.env.BASE_URL ||
+  `http://localhost:${process.env.PORT ? String(process.env.PORT) : "3000"}`;
 
 export async function getProducts(params: {
   q?: string;
