@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import express from "express";
+import express, { Request, Response } from "express";
 import pino from "pino";
 import productsRouter from "./api/products/router";
 import cartsRouter from "./api/carts/router";
@@ -17,7 +17,7 @@ app.use("/carts", cartsRouter);
 app.use("/webhooks/whatsapp", whatsappRouter);
 app.use(errorHandler);
 
-app.get("/", (_req, res) => {
+app.get("/", (_req: Request, res: Response) => {
   res.send("ok");
 });
 

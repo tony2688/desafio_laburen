@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { CartsService } from "../../services/carts/service";
 
 const router = Router();
 
-router.get("/", async (req, res, next) => {
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   const schema = z.object({
     whatsappUserId: z.string(),
     status: z.enum(["OPEN", "COMPLETED", "CANCELLED"]).optional(),
@@ -21,7 +21,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   const schema = z.object({
     whatsappUserId: z.string(),
     items: z
@@ -44,7 +44,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.patch("/:id", async (req, res, next) => {
+router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = z.string().parse(req.params.id);
     const schema = z.object({

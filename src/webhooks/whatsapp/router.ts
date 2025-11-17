@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import axios from "axios";
 import { handleUserMessage } from "../../agent";
 
 const router = Router();
 
-router.get("/", (req, res) => {
+router.get("/", (req: Request, res: Response) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -20,7 +20,7 @@ router.get("/", (req, res) => {
   res.sendStatus(403);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request, res: Response) => {
   try {
     const body: any = req.body || {};
     const entry = body.entry?.[0];
