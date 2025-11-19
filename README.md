@@ -36,9 +36,9 @@ Proyecto que implementa un **agente de IA** que atiende clientes por **WhatsApp*
 ```mermaid
 flowchart LR
   U[Usuario WhatsApp] --> WA[WhatsApp Cloud API]
-  WA --> WH[/webhooks/whatsapp]
+  WA --> WH[Webhook WhatsApp]
   WH --> AG[Agente IA]
-  AG -->|HTTP Tools| API[API REST /products, /carts]
+  AG -->|HTTP Tools| API[API REST (products, carts)]
   API --> SVC[Servicios de dominio]
   SVC --> PR[Prisma ORM]
   PR --> PG[(PostgreSQL)]
@@ -139,7 +139,7 @@ Errores de negocio mapeados: `stock_insufficient` / `cart_not_open` → 409; `ca
 ## Autor
 **Antonio Orlando Romero**
 - GitHub: [@tony2688](https://github.com/tony2688/desafio_laburen)
-- Email: antonioorlandoromero@gmail.com
+- Email: antonioorlandoromero2688@gmail.com
 - LinkedIn: https://www.linkedin.com/in/antonio-orlando-romero-7158b414b/
 
 Proyecto desarrollado como parte del desafío técnico para el rol de **AI Engineer / Desarrollador de agentes de IA**.
