@@ -1,9 +1,11 @@
+// router de carritos (crear, ver y editar)
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { CartsService } from "../../services/carts/service";
 
 const router = Router();
 
+// obtener el carrito activo por whatsappUserId
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   const schema = z.object({
     whatsappUserId: z.string(),
@@ -21,6 +23,7 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// crear o devolver carrito abierto y agregar items iniciales
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   const schema = z.object({
     whatsappUserId: z.string(),
@@ -44,6 +47,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// editar cantidades o eliminar items
 router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = z.string().parse(req.params.id);

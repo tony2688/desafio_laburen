@@ -1,9 +1,12 @@
+// cliente simple para usar gemini
 import { GoogleGenAI } from '@google/genai';
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+// el modelo se puede cambiar por env, le hago trim por las dudas
+const GEMINI_MODEL = (process.env.GEMINI_MODEL?.trim()) ?? 'gemini-2.5-flash';
 
 // La key se valida en tiempo de llamada para no romper el servidor al inicio
 
+// instancio el cliente con la api key del .env
 export const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || '',
 });
@@ -31,6 +34,7 @@ export async function callGeminiOnce(opts: {
 }> {
   const { systemPrompt, userText, whatsappUserId, tools } = opts;
   if (!process.env.GEMINI_API_KEY) {
+    // si falta la key, devuelvo un texto para no romper
     return {
       text: 'Estoy teniendo un problema técnico. Probemos de nuevo en un rato.',
       raw: { error: 'missing_gemini_key' },
@@ -60,6 +64,7 @@ export async function callGeminiOnce(opts: {
     ],
   };
 
+  // llamo al modelo con el prompt y tools declaradas
   const response = await ai.models.generateContent({
     model: GEMINI_MODEL,
     contents,

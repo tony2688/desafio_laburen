@@ -5,6 +5,7 @@
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_VERIFY_TOKEN`
 - `WHATSAPP_API_VERSION` (por defecto `24.0`)
+ - `WHATSAPP_OUTGOING_TO_OVERRIDE` (opcional, solo para pruebas locales)
 
 ### Webhook
 - Ruta: `POST /webhooks/whatsapp`
@@ -17,7 +18,7 @@
 
 ### Registrar números de prueba permitidos (Recipient list)
 - Entra al panel de la aplicación en Meta → sección `Configuración de la API → Enviar y recibir mensajes`.
-- En el selector `Para`, agrega el número del usuario en formato E.164 como dígitos continuos, sin `+` ni espacios. Ejemplo: `5493813581745`.
+- En el selector `Para`, agrega el número EXACTO que aparece en los logs del webhook como WA ID (`from`). Para móviles en Argentina, debe empezar con `54` y NO incluye `15`. Ejemplo: `543815555648`.
 - Para identificar el número correcto, envía un mensaje al bot y mira los logs del backend:
   - Ejemplo de log: `whatsapp_incoming { from: "5493813581745", text: "Hola" }`.
   - Usa exactamente ese valor de `from` para agregarlo en `Para`.
@@ -66,9 +67,20 @@
 - Descripción: al enviar `POST /{phone_number_id}/messages` devuelve 400 con el error `(#131030) Recipient phone number not in allowed list`.
 - Causas típicas:
   - El número no está agregado en el selector `Para` del panel de Meta.
-  - El número está agregado con un formato diferente al `from` de los logs.
+  - El número está agregado con un formato diferente al `from` de los logs (por ejemplo, falta el `9` o se incluye `15`).
 - Checklist:
   - El número en los logs (`from`) coincide exactamente con el configurado en `Para`.
   - `WHATSAPP_PHONE_NUMBER_ID` en el backend coincide con el que muestra el panel.
   - `WHATSAPP_ACCESS_TOKEN` es el token actual generado desde el botón `Generar token de acceso`.
   - El usuario recibió el mensaje de plantilla `hello_world` desde el panel.
+
+### Troubleshooting: tokens y sesión
+- `code 104` → falta el header `Authorization: Bearer` (o env vacío). Verifica `WHATSAPP_ACCESS_TOKEN`.
+- `code 190 / error_subcode 463` → token expirado. Genera uno nuevo y reinicia el servidor.
+
+### Referencias de implementación
+- Carga de `.env`: `src/index.ts:1-2`.
+- Lectura de `WHATSAPP_*` y construcción de URL: `src/webhooks/whatsapp/router.ts:40-41`.
+- Destino (`to`) desde `from` o override de pruebas: `src/webhooks/whatsapp/router.ts:43`.
+- Envío a Graph con header `Authorization`: `src/webhooks/whatsapp/router.ts:63-66`.
+- Clasificación de errores (token expirado, destinatario no permitido): `src/webhooks/whatsapp/router.ts:80-81`.

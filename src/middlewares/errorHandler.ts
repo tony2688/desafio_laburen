@@ -1,3 +1,4 @@
+// middleware para mapear errores a codigos http
 import { Request, Response, NextFunction } from "express";
 
 function mapError(e: unknown) {

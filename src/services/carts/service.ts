@@ -1,16 +1,20 @@
+// servicio de carritos: toda la logica de CRUD con prisma
 import { prisma } from "../../infra/prisma/client";
-import type { Product } from "@prisma/client";
+// uso un tipo local minimo para precios, evitando depender de tipos generados
+type ProductPrice = { price50: any; price100: any; price200: any };
 
 type ItemInput = { productId: string; quantity: number };
 
 export const CartsService = {
   async getActiveCart(whatsappUserId: string) {
+    // busca el carrito OPEN para el usuario
     return prisma.cart.findFirst({
       where: { whatsappUserId, status: "OPEN" },
       include: { items: true },
     });
   },
   async getOrCreateOpenCart(whatsappUserId: string) {
+    // si ya tiene carrito open lo devuelve, sino crea uno nuevo
     const existing = await prisma.cart.findFirst({
       where: { whatsappUserId, status: "OPEN" },
       include: { items: true },
@@ -34,7 +38,8 @@ export const CartsService = {
       if (!product || !product.isAvailable) {
         throw new Error("stock_insufficient");
       }
-      const existing = cart.items.find((ci) => ci.productId === it.productId);
+      const itemsInCart = (cart.items as Array<{ id: string; productId: string; quantity: number; subtotal: any; unitPrice: any }>);
+      const existing = itemsInCart.find((ci) => ci.productId === it.productId);
       const newQuantity = (existing?.quantity || 0) + it.quantity;
       if (product.availableQuantity < newQuantity) {
         throw new Error("stock_insufficient");
@@ -117,7 +122,7 @@ export const CartsService = {
   },
   async recalcTotals(cartId: string) {
     const items = await prisma.cartItem.findMany({ where: { cartId } });
-    const subtotal = items.reduce((acc, it) => acc + Number(it.subtotal), 0);
+    const subtotal = items.reduce((acc: number, it: { subtotal: any }) => acc + Number(it.subtotal), 0);
     const cart = await prisma.cart.update({
       where: { id: cartId },
       data: { subtotal, total: subtotal },
@@ -127,7 +132,7 @@ export const CartsService = {
   },
 };
 
-function getUnitPriceForQuantity(product: Product, quantity: number) {
+function getUnitPriceForQuantity(product: ProductPrice, quantity: number) {
   if (quantity < 50) return product.price50;
   if (quantity < 100) return product.price100;
   return product.price200;

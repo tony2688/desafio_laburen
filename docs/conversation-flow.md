@@ -3,6 +3,13 @@
 ### Nota sobre WhatsApp y sandbox
 - El bot siempre responde al `from` del webhook (WA ID del remitente).
 - En modo sandbox de WhatsApp Cloud API solo se puede enviar a números previamente autorizados en el panel (`Para`).
+ - Si pasaron más de 24 horas sin mensaje del usuario, primero se envía una plantilla (ej. `hello_world`), luego se habilita el texto libre.
+
+### Saludo y activación del agente
+- Usuario: "Hola"
+- Backend: registra `whatsapp_incoming` y llama al agente con `whatsappUserId` del `from` (`src/webhooks/whatsapp/router.ts:38`, `src/agent/index.ts:417-459`).
+- Agente (Gemini): devuelve respuesta y, si corresponde, ejecuta tools HTTP (`src/agent/index.ts:349-411`).
+- Envío: el backend publica a Graph con `to` igual al `from` (`src/webhooks/whatsapp/router.ts:43-45`, `src/webhooks/whatsapp/router.ts:55-68`).
 
 ### Explorar/buscar productos
 - Usuario: "Mostrame camisetas deportivas", "Buscá pantalón negro talla M"
@@ -24,3 +31,7 @@
 - Usuario: "Cambiá 123 a 1", "Eliminá 123", "Ver resumen"
 - Endpoint: `PATCH /carts/:id` (`updateItems`/`removeItems`) y `GET /carts?whatsappUserId=&status=OPEN`
 - Respuesta: acciones confirmadas y resumen actualizado.
+
+### Logs útiles
+- `whatsapp_incoming` y `whatsapp_outgoing_request`: ver destino, mensaje y URL (`src/webhooks/whatsapp/router.ts:38, 44`).
+- `whatsapp_outgoing_error`: ver `code` y `error_subcode`; clasifica `recipient_not_allowed` (131030) y `token_expired` (190/463) (`src/webhooks/whatsapp/router.ts:80-81`).

@@ -1,9 +1,11 @@
+// router de productos (listar y detalle)
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { ProductsService } from "../../services/products/service";
 
 const router = Router();
 
+// lista con filtros basicos
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   const schema = z.object({
     q: z.string().optional(),
@@ -19,6 +21,7 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// detalle por id
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = z.string().parse(req.params.id);

@@ -1,3 +1,4 @@
+// src/agent/index.ts
 import {
   getProducts,
   getProductById,
@@ -7,28 +8,109 @@ import {
 } from './tools';
 import { callGeminiOnce, ToolDefinition, ToolCall } from './geminiClient';
 
-// Prompt de sistema adaptado a Gemini
+// =====================
+// Prompt de sistema
+// =====================
+
 const systemPrompt = `
-Sos el asistente de ventas de Laburen.
+Sos el asistente de ventas de Laburen que atiende a clientes por WhatsApp.
 
 Objetivo:
-- Ayudar al usuario de WhatsApp a explorar productos de indumentaria y armar su carrito.
+- Ayudar al usuario a explorar el catálogo, buscar productos (por tipo, categoría, color, talle o ID) y armar/editar su carrito.
+- Siempre usar las tools (getProducts, getProductById, getCart, createCart, updateCart) para leer o modificar datos reales. No inventes productos, precios, stock ni disponibilidad.
 
-Capacidades:
-- Listar o buscar productos del catálogo (filtrando por texto).
-- Mostrar el detalle de un producto puntual.
-- Crear un carrito y agregar ítems.
-- Editar un carrito existente: cambiar cantidades, eliminar ítems, ver resumen.
+Estilo:
+- Respondé siempre en español, usando "vos", tono profesional y cercano.
+- Sé claro y relativamente breve. Usá listas con viñetas y saltos de línea para que se lea fácil en WhatsApp.
 
-Reglas importantes:
-- Siempre que necesites datos de catálogo o carritos, usá las herramientas disponibles.
-- El contexto del usuario se identifica por "whatsappUserId".
-- Si el usuario no tiene carrito aún y quiere comprar, creá uno nuevo.
-- Respondé SIEMPRE en español, en tono profesional pero cercano.
-- Sé breve pero útil; no devuelvas JSON ni estructuras técnicas al usuario final.
+Uso de herramientas:
+
+1) Búsqueda y catálogo (getProducts):
+- Usá getProducts para:
+  - "ver catálogo", "mostrar todo", "ver productos", etc. (q vacío o genérico).
+  - búsquedas como "pantalón verde", "pantalón xxl", "falda formal negra", etc. (q = texto completo del usuario).
+- No obligues al usuario a decir primero "tipo y categoría". Si ya dijo algo (por ejemplo "pantalón verde"), intentá buscar directo con getProducts(q = texto).
+
+2) Detalle por ID (getProductById):
+- Si el usuario dice "ver 001", "ver producto 16", "mostrar el 007", etc., interpretá el número como ID y usá getProductById con ese ID.
+
+3) Carrito (getCart, createCart, updateCart):
+- Usá getCart sobre todo cuando el usuario diga cosas como:
+  - "ver carrito", "mostrame mi carrito", "qué tengo en el carrito".
+- Cuando el usuario diga cosas como:
+  - "agregá 50 del 100", "sumá 10 del 001 al carrito", "poné 20 del 016"
+  NO llames a getCart.
+  En esos casos:
+    - Llamá directamente a createCart con ese ítem si asumís que puede ser su primer carrito.
+    - O a updateCart si el orquestador ya te pasó un cartId en el contexto.
+- El backend se encarga de crear o reutilizar el carrito según el whatsappUserId.
+
+Formato de LISTADO de productos (respuesta de getProducts):
+- Cada producto debe mostrarse en una línea con el siguiente formato EXACTO:
+
+  • {ID_3_DIGITOS} - {type} – {category} - {description} - Talle {size} - Color {color}
+
+- El ID debe ir siempre con 3 dígitos (1 → 001, 16 → 016, 100 → 100).
+- Ejemplos:
+  • 001 - Pantalón – Deportivo - Ideal para uso diario - Talle XXL - Color Verde
+  • 007 - Pantalón – Deportivo - Diseño moderno y elegante. - Talle L - Color Gris
+
+- Al final del listado, explicá qué puede hacer el usuario, por ejemplo:
+  - "Si te interesa alguno, decime: 'ver 001' o 'agregá 10 del 001 al carrito'."
+  - "Para ver más resultados, pedime 'ver página 2' o decime un filtro más específico (tipo, color, talle)."
+
+- Si getProducts devuelve EXACTAMENTE un producto y el usuario usó una búsqueda por texto (por ejemplo "pantalón verde"), podés mostrar directamente el DETALLE de ese producto en vez de la lista.
+
+Formato de DETALLE de producto (respuesta de getProductById):
+- Cuando mostrás un producto específico, usá este formato:
+
+  Producto {ID_3_DIGITOS} - {type} – {category} - {description}
+  Talle {size} - Color {color}
+
+  Cantidad disponible: {availableQuantity}
+  Precio 50u: {price50} {currency}
+  Precio 100u: {price100} {currency}
+  Precio 200u: {price200} {currency}
+
+- Si el campo isAvailable es false:
+  - Agregá la línea:
+    ⚠️ Este producto no está disponible por el momento.
+
+- Después del detalle, indicá algo como:
+  - "Si querés, decime cuántas unidades querés agregar al carrito. Ejemplo: 'agregá 10 del 001'."
+
+Disponibilidad y stock:
+- Nunca asumas que un producto se puede agregar al carrito si:
+  - isAvailable === false, o
+  - la API de carrito devuelve un error de disponibilidad/stock.
+- En esos casos, explicá en lenguaje natural que el producto no está disponible o que no hay stock suficiente.
+- No mientas ni digas que algo se agregó al carrito si la operación falló.
+
+Intenciones básicas que debés manejar:
+- Explorar catálogo:
+  - "ver catálogo", "mostrar todos los productos", "ver productos", "quiero ver todo"
+  - → getProducts(q vacío o genérico) + listado paginado.
+
+- Buscar productos:
+  - "pantalón verde", "pantalón xxl", "falda formal", "remera deportiva negra", etc.
+  - → getProducts(q = texto usuario) + listado.
+  - Si hay un solo resultado, podés mostrar directamente el DETALLE.
+
+- Ver detalle:
+  - "ver 001", "mostrar producto 16", "quiero el 007"
+  - → getProductById(id).
+
+- Agregar al carrito:
+  - "agregá 10 del 001 al carrito", "sumá 5 del 016", etc.
+  - → usá el ID para crear/actualizar carrito usando las tools.
+
+Recordá siempre: usá las tools, no inventes datos, y respetá el formato de salida para listados y detalles.
 `;
 
-// Definición de herramientas (mismas que nuestro backend)
+// =====================
+// Definición de tools
+// =====================
+
 const tools: ToolDefinition[] = [
   {
     name: 'getProducts',
@@ -156,26 +238,45 @@ const tools: ToolDefinition[] = [
   },
 ];
 
-// Helpers de formato para la respuesta al usuario
+// =====================
+// Helpers para formato
+// =====================
 
 function formatProductsList(result: any): string {
   if (!result || !Array.isArray(result.items) || result.items.length === 0) {
     return 'No encontré productos con esa descripción. Probá con otro término o sé un poco más específico (tipo de prenda, color, talle...).';
   }
 
-  const lines = result.items.slice(0, 5).map((p: any) => {
-    const desc = p.description || `${p.type ?? ''} ${p.size ?? ''} ${p.color ?? ''}`.trim();
-    return `• #${p.id} – ${desc} – ${p.price50} ${p.currency} (stock: ${p.availableQuantity})`;
+  const lines = result.items.map((p: any) => {
+    const id3 = String(p.id).padStart(3, '0');
+    const tipo = p.type ?? '';
+    const categoria = p.category ?? '';
+    const desc = p.description ?? '';
+    const talla = p.size ?? '-';
+    const color = p.color ?? '-';
+
+    // • 001 - Pantalón – Deportivo - Ideal para uso diario - Talle XXL - Color Verde
+    return `• ${id3} - ${tipo} – ${categoria} - ${desc} - Talle ${talla} - Color ${color}`;
   });
 
+  const page = result.page ?? 1;
+  const pageSize = result.page_size || result.items.length || 10;
+  const total = result.total ?? result.items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return [
-    `Encontré ${result.total} producto(s). Te muestro algunos:`,
+    `Encontré ${total} producto(s). Página ${page} de ${totalPages}:`,
     '',
     ...lines,
     '',
-    'Si te interesa alguno, podés decirme por ejemplo:',
-    '- "ver producto 100"',
-    '- "agregá 10 del 100 al carrito"',
+    'Si te interesa alguno, decime por ejemplo:',
+    '- "ver 001"',
+    '- "agregá 10 del 001 al carrito"',
+    '',
+    `Para ver más resultados, pedime "ver página ${Math.min(
+      page + 1,
+      totalPages,
+    )}" o decime un filtro más específico (tipo, color, talle).`,
   ].join('\n');
 }
 
@@ -184,21 +285,33 @@ function formatProductDetail(product: any): string {
     return 'No encontré ese producto. Verificá el ID y probemos de nuevo.';
   }
 
-  const base = product.description || `${product.type ?? ''} ${product.size ?? ''} ${product.color ?? ''}`.trim();
+  const id3 = String(product.id).padStart(3, '0');
+  const titulo = `Producto ${id3} - ${product.type ?? ''} – ${
+    product.category ?? ''
+  }${product.description ? ' - ' + product.description : ''}`.trim();
+  const variantes = `Talle ${product.size ?? '-'} - Color ${product.color ?? '-'}`;
 
-  return [
-    `Detalle del producto #${product.id}:`,
-    base,
+  const lines: string[] = [
+    titulo,
+    variantes,
     '',
-    `Precios por tramo (moneda: ${product.currency}):`,
-    `- Hasta 49 unidades: ${product.price50}`,
-    `- 50 a 99 unidades: ${product.price100}`,
-    `- 100+ unidades: ${product.price200}`,
+    `Cantidad disponible: ${product.availableQuantity}`,
+    `Precio 50u: ${product.price50} ${product.currency}`,
+    `Precio 100u: ${product.price100} ${product.currency}`,
+    `Precio 200u: ${product.price200} ${product.currency}`,
     '',
-    `Stock disponible: ${product.availableQuantity}`,
-    '',
-    'Si querés, decime cuántas unidades y lo agregamos al carrito.',
-  ].join('\n');
+  ];
+
+  if (product.isAvailable === false) {
+    lines.push('⚠️ Este producto no está disponible por el momento.');
+    lines.push('');
+  }
+
+  lines.push(
+    'Si querés, decime cuántas unidades querés agregar al carrito. Ejemplo: "agregá 10 del 001".',
+  );
+
+  return lines.join('\n');
 }
 
 function formatCart(cart: any): string {
@@ -229,18 +342,36 @@ function formatCart(cart: any): string {
   ].join('\n');
 }
 
-// Ejecutar la tool pedida por Gemini
+// =====================
+// Ejecución de tools
+// =====================
 
-async function executeToolCall(toolCall: ToolCall, whatsappUserId: string): Promise<string> {
+async function executeToolCall(
+  toolCall: ToolCall,
+  whatsappUserId: string,
+): Promise<string> {
   const { name, args } = toolCall;
 
   switch (name) {
     case 'getProducts': {
       const result = await getProducts({
-        q: args.q,
+        q: args.q ?? '',
         page: args.page ?? 1,
         page_size: args.page_size ?? 5,
       });
+
+      // Si la búsqueda de texto devuelve un único producto, mostrar detalle directo
+      if (
+        args.q &&
+        result &&
+        Array.isArray(result.items) &&
+        result.items.length === 1
+      ) {
+        const only = result.items[0];
+        const detail = await getProductById({ id: String(only.id) });
+        return formatProductDetail(detail);
+      }
+
       return formatProductsList(result);
     }
     case 'getProductById': {
@@ -279,7 +410,10 @@ async function executeToolCall(toolCall: ToolCall, whatsappUserId: string): Prom
   }
 }
 
-// Punto de entrada usado por el webhook de WhatsApp
+// =====================
+// Entrada principal (webhook)
+// =====================
+
 export async function handleUserMessage(params: {
   text: string;
   whatsappUserId: string;
@@ -287,11 +421,21 @@ export async function handleUserMessage(params: {
   const { text, whatsappUserId } = params;
 
   try {
+    console.log('gemini_input', {
+      whatsappUserId: String(whatsappUserId),
+      text: String(text),
+    });
+
     const { text: modelText, toolCall } = await callGeminiOnce({
       systemPrompt,
       userText: text,
       whatsappUserId,
       tools,
+    });
+
+    console.log('gemini_output', {
+      whatsappUserId: String(whatsappUserId),
+      hasToolCall: !!toolCall,
     });
 
     // Si Gemini no pidió ninguna tool, respondemos con su texto directo
@@ -304,6 +448,9 @@ export async function handleUserMessage(params: {
 
     // Si pidió tool, ejecutamos contra nuestra API y formateamos respuesta
     const toolAnswer = await executeToolCall(toolCall, whatsappUserId);
+    console.log('gemini_tool_answer', {
+      whatsappUserId: String(whatsappUserId),
+    });
     return toolAnswer;
   } catch (err) {
     console.error('Error en handleUserMessage (Gemini):', err);
