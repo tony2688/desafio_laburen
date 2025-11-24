@@ -226,3 +226,18 @@ El modelo entiende lenguaje natural.
 La IA decide qué herramienta usar según la intención.
 
 Los resultados vienen de la API REST (productos + carritos), no de reglas estáticas.
+
+---
+
+## Cambios recientes
+
+- Búsqueda tolerante a acentos (sin tocar la base de datos): el servicio expande variantes con y sin tilde en `type`, `size`, `color`, `category` y `description`.
+- Sinónimos regionales y plural/singular: reconoce `pantalón/pantalones`, `playera/camiseta/remera`, `suéter/sudadera/buzo/jersey`, `abrigo/chaqueta/campera`.
+- Parser conversacional:
+  - Verbos adicionales: `añade/añadir` y conector `código`.
+  - Cantidades en palabras: `una/dos/veinte`, y compuestos: `ciento veinte y tres`.
+  - Pago directo: `quiero pagar` dispara el flujo de pago sin exigir “carrito”.
+  - Agregar por descripción: `agregá 20 de pantalón verde` busca el producto y agrega 20 si hay una sola coincidencia.
+- Visualización de códigos:
+  - Catálogo y mensajes usan IDs sin ceros a la izquierda (por ejemplo `#91` en vez de `#091`).
+  - El resumen del carrito incluye una línea con “Códigos en tu carrito: #91 Nombre · #100 Nombre …”.

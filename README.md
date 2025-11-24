@@ -11,54 +11,49 @@
 
 </div>
 
-Proyecto que implementa un **agente de IA** que atiende clientes por **WhatsApp**: interpreta lenguaje natural, consulta la **API REST** del catálogo, y arma/edita un **carrito**. No usa menús predefinidos; usa tools (function calling) para operar con datos reales.
+Agente de IA que atiende clientes por **WhatsApp**: interpreta lenguaje natural, consulta la **API REST** del catálogo y arma/edita un **carrito** con datos reales. No utiliza menús predefinidos; opera mediante tools (function calling) integradas con el backend.
 
 ## Índice
 - Introducción
+- Requisitos del sistema
+- Instalación y configuración
+- Ejemplos de uso
 - Arquitectura
-- Requisitos
-- Configuración (env / base de datos)
-- Puesta en marcha (dev)
-- API de ejemplo (curl)
-- WhatsApp Cloud API (sandbox)
 - Estructura del proyecto
-- Seguridad
-- Autor
+- API y WhatsApp Cloud API
+- Contribución y código de conducta
+- Estado del proyecto y roadmap
+- Licencia y créditos
 
 ## Introducción
-- Explora productos, busca por tipo/color/talle, y muestra detalle con stock y precios por tramo.
-- Crea y actualiza carritos desde la conversación. El identificador de sesión es el `whatsappUserId` (WA ID).
-- El agente usa herramientas HTTP: `getProducts`, `getProductById`, `getCart`, `createCart`, `updateCart`.
+- Explora productos, busca por tipo/color/talle y muestra detalle con stock y precios por tramo.
+- Crea y actualiza carritos desde la conversación. El identificador de sesión es `whatsappUserId`.
+- Tools disponibles: `getProducts`, `getProductById`, `getCart`, `createCart`, `updateCart`.
 - Documentación ampliada: `docs/README_IA.md`.
 
-## Arquitectura
+### Cambios recientes
+- Visualización de códigos sin ceros a la izquierda (#100 en vez de #001) en catálogo, detalle, carrito y confirmaciones.
+- Búsqueda tolerante a acentos y sinónimos (map estático + variantes dinámicas desde datos reales).
+- Parser conversacional mejorado: agregar por descripción (tipo/color/talle), cantidades en palabras y flujos guía.
+- Código fuente documentado con JSDoc en módulos críticos (parser, agente, servicios, routers, webhook).
 
-```mermaid
-flowchart LR
-  U[Usuario WhatsApp] --> WA[WhatsApp Cloud API]
-  WA --> WH[Webhook WhatsApp]
-  WH --> AG[Agente IA]
-  AG -- HTTP Tools --> API[API REST: products, carts]
-  API --> SVC[Servicios de dominio]
-  SVC --> PR[Prisma ORM]
-  PR --> PG[(PostgreSQL)]
-  AG --> LLM[Gemini]
+## Requisitos del sistema
+- Sistema operativo: Windows/macOS/Linux.
+- Node.js `>=20` y TypeScript `>=5`.
+- PostgreSQL accesible vía `DATABASE_URL`.
+- Cuenta de WhatsApp Cloud API (token, phone number ID y verify token).
+- Clave de API de Gemini (`GEMINI_API_KEY`).
+
+## Instalación y configuración
+
+### 1) Clonar e instalar dependencias
+```bash
+git clone https://github.com/tony2688/desafio_laburen.git
+cd desafio_laburen
+npm install
 ```
 
-- Punto de entrada del servidor: `src/index.ts:1-51`.
-- Webhook WhatsApp: `GET` verificación `src/webhooks/whatsapp/router.ts:10-23`; `POST` recepción `src/webhooks/whatsapp/router.ts:26-89`.
-- Agente IA: orquestación y tools en `src/agent/index.ts:1-459`.
-- Cliente Gemini: `src/agent/geminiClient.ts:1-85`.
-- API y servicios: `src/api/products/router.ts`, `src/api/carts/router.ts`, `src/services/*`.
-
-## Requisitos
-- Node.js 20+.
-- PostgreSQL accesible vía `DATABASE_URL`.
-
-## Configuración
-
-Variables de entorno principales:
-
+### 2) Variables de entorno (`.env`)
 ```bash
 # App
 PORT=3000
@@ -79,19 +74,40 @@ WHATSAPP_API_VERSION=24.0
 WHATSAPP_OUTGOING_TO_OVERRIDE= # opcional para pruebas locales
 ```
 
-Base de datos y datos iniciales:
-- Generar cliente: `npm run prisma:generate`.
-- Aplicar migraciones: `npx prisma migrate deploy` (o `npx prisma migrate dev`).
-- Cargar catálogo desde `products.xlsx`: `npm run seed`.
+### 3) Base de datos
+```bash
+npm run prisma:generate
+npx prisma migrate deploy # o: npx prisma migrate dev
+```
 
-## Puesta en marcha (dev)
-- Compilar: `npm run build`.
-- Semilla: `npm run seed`.
-- Desarrollo: `npm run dev`.
-- Health: `GET /` → `ok`; `GET /healthz` → `{ status:"ok" }`; `GET /healthz/gemini` → `{ status, model, text }`.
+### 4) Puesta en marcha
+```bash
+npm run build   # compila TypeScript
+npm run dev     # entorno de desarrollo (watch)
+# Opcional: npm start   # requiere build previo
+```
 
-## API de ejemplo (curl)
+Health:
+- `GET /` → `ok`
+- `GET /healthz` → `{ status:"ok" }`
+- `GET /healthz/gemini` → `{ status, model, text }`
 
+## Ejemplos de uso
+
+Conversación típica (WhatsApp):
+- "mostrame el catálogo"
+- "ver 100"
+- "agregá 50 del 100"
+- "cambiá a 5 unidades del 100"
+- "eliminá el 100 del carrito"
+- "ver carrito"
+
+Casos prácticos tolerantes:
+- Agregar por descripción: "agregá 20 de pantalón verde" → busca y agrega si hay una sola coincidencia.
+- Cantidades en palabras: "ciento veinte y tres" → `123`.
+- Sinónimos y acentos: "camiseta" ≈ "remera", "pantalon" ≈ "pantalón".
+
+API (curl):
 ```bash
 # Buscar productos
 curl "http://localhost:3000/products?q=remera&page=1&page_size=5"
@@ -113,13 +129,27 @@ curl -X PATCH "http://localhost:3000/carts/<cartId>" \
   -d '{"updateItems":[{"productId":"100","quantity":5}]}'
 ```
 
-Errores de negocio mapeados: `stock_insufficient` / `cart_not_open` → 409; `cart_not_found` / `product_not_found` → 404 (`src/middlewares/errorHandler.ts:1-24`).
+Errores de negocio mapeados: `stock_insufficient` / `cart_not_open` → 409; `cart_not_found` / `product_not_found` → 404 (`src/middlewares/errorHandler.ts`).
 
-## WhatsApp Cloud API (sandbox)
-- Endpoint: `POST /webhooks/whatsapp`; verificación `GET /webhooks/whatsapp?...`.
-- Envío de respuestas a Graph con `Authorization: Bearer <WHATSAPP_ACCESS_TOKEN>` (`src/webhooks/whatsapp/router.ts:63-66`).
-- Errores comunes: token expirado (190/463), destinatario no permitido (131030). Guía completa en `docs/whatsapp-setup.md`.
-- Flujo conversacional y herramientas del agente: `docs/conversation-flow.md`.
+## Arquitectura
+
+```mermaid
+flowchart LR
+  U[Usuario WhatsApp] --> WA[WhatsApp Cloud API]
+  WA --> WH[Webhook WhatsApp]
+  WH --> AG[Agente IA]
+  AG -- HTTP Tools --> API[API REST: products, carts]
+  API --> SVC[Servicios de dominio]
+  SVC --> PR[Prisma ORM]
+  PR --> PG[(PostgreSQL)]
+  AG --> LLM[Gemini]
+```
+
+- Punto de entrada del servidor: `src/index.ts`.
+- Webhook WhatsApp: `src/webhooks/whatsapp/router.ts`.
+- Agente IA (orquestación y tools): `src/agent/index.ts`.
+- Cliente Gemini: `src/agent/geminiClient.ts`.
+- Routers y servicios: `src/api/*`, `src/services/*`.
 
 ## Estructura del proyecto
 - `src/index.ts` servidor Express y health.
@@ -129,17 +159,52 @@ Errores de negocio mapeados: `stock_insufficient` / `cart_not_open` → 409; `ca
 - `src/agent/geminiClient.ts` integración con Google GenAI.
 - `src/api/*` routers de productos y carritos.
 - `src/services/*` reglas de negocio (Prisma ORM).
-- `src/infra/*` Prisma client y `seed.ts` (carga `products.xlsx`).
+- `src/infra/*` Prisma client (si aplica en futuras fases).
 - `prisma/*` esquema y migraciones.
 
-## Seguridad
-- No publicar claves en el repo. Usar `.env` local seguro.
-- El webhook registra logs útiles, pero evita incluir datos sensibles.
+## API y WhatsApp Cloud API
+- Endpoint de webhook: `POST /webhooks/whatsapp`; verificación: `GET /webhooks/whatsapp?...`.
+- Envío de respuestas a Graph con `Authorization: Bearer <WHATSAPP_ACCESS_TOKEN>`.
+- Errores comunes: token expirado (190/463), destinatario no permitido (131030).
+- Flujo conversacional y herramientas del agente: `docs/conversation-flow.md`.
 
-## Autor
-**Antonio Orlando Romero**
-- GitHub: [@tony2688](https://github.com/tony2688/desafio_laburen)
-- Email: antonioorlandoromero@gmail.com
-- LinkedIn: https://www.linkedin.com/in/antonio-orlando-romero-7158b414b/
+## Contribución y código de conducta
+
+### Cómo contribuir
+- Fork y branch por feature: `feature/<breve-descripcion>`.
+- Mantener estilo de código y patrones existentes.
+- No incluir secretos en commits; usar `.env` local.
+- Antes de abrir PR:
+  - `npm run build` sin errores.
+  - Verificación manual de endpoints y flujo WhatsApp.
+  - Describir cambios y motivación en el PR.
+
+### Código de conducta
+- Comunicación respetuosa y profesional.
+- Cero tolerancia con discriminación u hostigamiento.
+- Constructivo en revisiones: enfocar en código y requerimientos.
+
+## Estado del proyecto y roadmap
+
+Estado actual:
+- Catálogo y carritos operativos vía tools y API.
+- Visualización de códigos sin ceros a la izquierda.
+- Búsqueda robusta: acentos y sinónimos (estático + dinámico).
+- Parser conversacional con agregar por descripción y cantidades en palabras.
+- Código fuente comentado con JSDoc en módulos críticos.
+
+Próximas características:
+- Integración de pagos y cierre de carrito.
+- Panel admin básico para monitoreo y validaciones.
+- Rate limiting y controles anti-abuso.
+- Tests automatizados y cobertura mínima.
+- Multilenguaje mejorado y más sinónimos del dominio.
+
+## Licencia y créditos
+- Licencia: MIT (se recomienda agregar `LICENSE` al repositorio en producción).
+- Autor: **Antonio Orlando Romero**
+  - GitHub: [@tony2688](https://github.com/tony2688/desafio_laburen)
+  - Email: antonioorlandoromero@gmail.com
+  - LinkedIn: https://www.linkedin.com/in/antonio-orlando-romero-7158b414b/
 
 Proyecto desarrollado como parte del desafío técnico para el rol de **AI Engineer / Desarrollador de agentes de IA**.

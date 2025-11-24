@@ -30,6 +30,17 @@ flowchart LR
 - Servicios de dominio (Prisma): `src/services/products/service.ts`, `src/services/carts/service.ts`.
 - Base de URL para tools del agente: `BASE_URL` (opcional) o `http://localhost:PORT` (`src/agent/tools.ts:4-18`).
 
+**Normalización y acentos dinámicos**
+- La capa de servicios expande variantes con y sin acento para tokens de catálogo (tipo, color, categoría, descripción) sin modificar la base de datos.
+- Se generan variantes dinámicas a partir de los valores existentes en `products` y se aplican junto con sinónimos plural/singular.
+- Beneficio: matching robusto para consultas como `pantalón/pantalon`, `marrón/marron`, `suéter/sueter`.
+
+**Parser y formato de mensajes**
+- Verbos admitidos: `agrega/suma/pon/añade/añadir`; conector `código`.
+- Cantidades en palabras y compuestas: `una/dos/...` y `ciento veinte y tres`.
+- Agregar por descripción: `agregá 20 de pantalón verde` → agrega si hay coincidencia única.
+- IDs mostrados sin ceros a la izquierda en catálogo, detalle y carrito.
+
 **Health y observabilidad**
 - `GET /healthz` estado general.
 - `GET /healthz/gemini` ejecuta una llamada mínima al modelo y retorna `status`, `model` y `text` (`src/index.ts:29-43`).

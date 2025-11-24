@@ -11,11 +11,16 @@
   - Búsqueda por texto libre sobre `type`, `size`, `color`, `category`, `description`.
   - Solo productos disponibles y con stock > 0.
  - Implementación: `src/api/products/router.ts` y servicio correspondiente.
+ - Acentos y sinónimos:
+   - La búsqueda expande variantes con y sin tilde a nivel aplicación (no requiere cambios en DB).
+   - Se aplican sinónimos de dominio y plural/singular (ej.: `pantalón/pantalones`, `playera/camiseta/remera`, `suéter/sudadera/buzo/jersey`).
+   - La normalización no altera la respuesta; solo mejora el matching.
 
 ### GET /products/:id
 - Respuesta: `Product`
 - Campos: `{ id, type, size, color, category, price50, price100, price200, currency, availableQuantity, isAvailable, description }`
- - Implementación: `src/api/products/router.ts`.
+- Implementación: `src/api/products/router.ts`.
+ - Visualización: el agente muestra el ID sin ceros a la izquierda (p. ej. `#91`).
 
 ### POST /carts
 - Body:
@@ -41,9 +46,13 @@
   - `removeItems`: elimina ítems del carrito.
 - Respuesta:
   - Carrito actualizado: `{ id, whatsappUserId, status, currency, subtotal, total, items: [{ productId, productNameSnapshot, quantity, unitPrice, subtotal }] }`
- - Códigos: 200; errores de negocio 409 (`stock_insufficient`, `cart_not_open`), 404 (`product_not_found`, `cart_not_found`).
+- Códigos: 200; errores de negocio 409 (`stock_insufficient`, `cart_not_open`), 404 (`product_not_found`, `cart_not_found`).
 - Implementación: `src/api/carts/router.ts:49-71` y `src/middlewares/errorHandler.ts:1-23`.
- - Implementación: `src/api/carts/router.ts:51-73` y `src/middlewares/errorHandler.ts:1-24`.
+- Implementación: `src/api/carts/router.ts:51-73` y `src/middlewares/errorHandler.ts:1-24`.
+ - Conversacional:
+   - El agente acepta `añade/añadir` y `código` como conectores.
+   - Soporta cantidades en palabras y compuestas (`ciento veinte y tres`).
+   - Puede agregar por descripción (`agregá 20 de pantalón verde`) resolviendo el producto cuando hay coincidencia única.
 
 ### GET /carts?whatsappUserId=&status=OPEN
 - Respuesta: carrito `OPEN` del usuario si existe; `404` si no.
